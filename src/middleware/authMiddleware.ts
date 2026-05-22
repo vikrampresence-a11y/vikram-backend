@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import User from '../models/User';
+import { supabase } from '../supabaseClient';
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -32,15 +33,37 @@ export const protect = async (
       process.env.JWT_SECRET || 'fallback_secret'
     );
 
-    const user = await User.findById(decoded.id).select('-password -otp -otpExpiry');
-
-    if (!user) {
-      res.status(401).json({ message: 'Not authorized — user not found.' });
+    // If the token payload ID is an email (from OTP guest flow)
+    if (decoded.id && decoded.id.includes('@')) {
+      const { data: guestUser } = await supabase
+        .from('customer_otps')
+        .select('*')
+        .eq('email', decoded.id)
+        .single();
+        
+      if (!guestUser) {
+        res.status(401).json({ message: 'Not authorized — user not found in OTP records.' });
+        return;
+      }
+      
+      req.user = guestUser;
+      next();
       return;
     }
 
-    req.user = user;
-    next();
+    // Legacy MongoDB check (skip if no Mongo connection)
+    try {
+      const user = await User.findById(decoded.id).select('-password -otp -otpExpiry');
+      if (!user) {
+        res.status(401).json({ message: 'Not authorized — user not found.' });
+        return;
+      }
+      req.user = user;
+      next();
+    } catch (e) {
+      res.status(401).json({ message: 'Not authorized — Database unavailable.' });
+      return;
+    }
   } catch (error: any) {
     if (error.name === 'TokenExpiredError') {
       res.status(401).json({ message: 'Session expired. Please log in again.' });

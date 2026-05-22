@@ -287,12 +287,10 @@ router.post(
 
       if (upsertError) throw new Error('Failed to save OTP to database');
 
-      // 4. Send Custom Email via SMTP
-      try {
-        await sendOTPEmail(email, name, otp);
-      } catch (mailError: any) {
+      // 4. Send Custom Email via SMTP (Asynchronously for speed)
+      sendOTPEmail(email, name, otp).catch((mailError: any) => {
         console.error('SMTP Error:', mailError.message);
-      }
+      });
 
       res.json({ message: 'Verification code sent to your email successfully.' });
     } catch (error: any) {
