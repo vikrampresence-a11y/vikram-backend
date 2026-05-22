@@ -425,4 +425,15 @@ router.put(
   }
 );
 
+// ─── DIAGNOSTIC ROUTE ────────────────────────────────────────────────────────
+router.get('/test-smtp', async (req, res) => {
+  try {
+    const { sendOTPEmail } = require('../config/mailer');
+    await sendOTPEmail('vikramsingh328013@gmail.com', 'Test User', '1234');
+    res.json({ success: true, message: 'Email sent successfully from Render!' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+  }
+});
+
 export default router;
